@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Egg Click Game</title>
+    <style>
+        #gameArea {
+            width: 800px;
+            height: 600px;
+            position: relative;
+            border: 1px solid black;
+        }
+        .egg {
+            width: 50px;
+            height: 70px;
+            background-color: #fff;
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            cursor: pointer;
+            position: absolute;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+        }
+        #winScreen {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border: 1px solid black;
+        }
+        #leaderboard {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameArea"></div>
+    <div id="winScreen">
+        <h2>You Won! Time: <span id="finalTime"></span>s</h2>
+        <input type="text" id="nameInput" placeholder="Enter your name">
+        <button onclick="submitScore()">Submit</button>
+    </div>
+    <div id="leaderboard">
+        <h3>Leaderboard</h3>
+        <ol id="scoresList"></ol>
+    </div>
+
+    <!-- Replace with your Firebase config -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script>
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        let eggCount = 0;
+        let startTime;
+        let timer;
+
+        function createEgg() {
+            const egg = document.createElement('div');
+            egg.className = 'egg';
+            egg.style.left = Math.random() * 750 + 'px';
+            egg.style.top = Math.random() * 530 + 'px';
+            egg.onclick = function() {
+                egg.remove();
+                eggCount++;
+                if(eggCount >= 25) {
+                    endGame();
+                    return;
+                }
+                createEgg();
+            };
+            document.getElementById('gameArea').appendChild(egg);
+        }
+
+        function startGame() {
+            startTime = Date.now();
+            timer = setInterval(updateTime, 1000);
+            createEgg();
+        }
+
+        function updateTime() {
+            const currentTime = Math.floor((Date.now() - startTime) / 1000);
+            document.getElementById('finalTime').textContent = currentTime;
+        }
+
+        function endGame() {
+            clearInterval(timer);
+            document.getElementById('winScreen').style.display = 'block';
+            updateTime();
+        }
+
+        async function submitScore() {
+            const name = document.getElementById('nameInput').value.trim();
+            const time = parseInt(document.getElementById('finalTime').textContent);
+            
+            if(name) {
+                await db.collection('scores').add({
+                    name: name,
+                    time: time,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                loadLeaderboard();
+                document.getElementById('winScreen').style.display = 'none';
+            }
+        }
+
+        async function loadLeaderboard() {
+            const snapshot = await db.collection('scores')
+                .orderBy('time', 'asc')
+                .limit(25)
+                .get();
+            
+            const scoresList = document.getElementById('scoresList');
+            scoresList.innerHTML = '';
+            
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const li = document.createElement('li');
+                li.textContent = `${data.name}: ${data.time}s`;
+                scoresList.appendChild(li);
+            });
+        }
+
+        // Start the game and load leaderboard
+        startGame();
+        loadLeaderboard();
+    </script>
+</body>
+</html>
